@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: finguard
+          POSTGRES_PASSWORD: finguard_pass
+          POSTGRES_DB: finguard_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U finguard -d finguard_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://finguard:finguard_pass@localhost:5432/finguard_db
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies (for xgboost)
+        run: sudo apt-get update && sudo apt-get install -y libgomp1
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run database migrations
+        run: alembic upgrade head
+
+      - name: Seed database with sample data
+        run: python -m app.simulator.seed_database --count 500 --fraud-rate 0.05
+
+      - name: Train fraud detection model
+        run: python -m app.ml.train
+
+      - name: Run test suite
+        run: pytest -v
