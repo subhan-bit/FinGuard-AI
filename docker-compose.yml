@@ -11,6 +11,25 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finguard -d finguard_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: finguard-api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://finguard:finguard_pass@postgres:5432/finguard_db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app/ml/artifacts:/app/app/ml/artifacts
 
 volumes:
   postgres_data:
