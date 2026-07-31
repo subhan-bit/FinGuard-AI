@@ -46,7 +46,13 @@ class TransactionScoreRequest(BaseModel):
     country: str
 
 
+class FeatureImpact(BaseModel):
+    feature: str
+    impact: float
+
+
 class TransactionScoreResponse(BaseModel):
     fraud_score: float
     predicted_fraud: bool
     flagged: bool
+    explanation: list[FeatureImpact]

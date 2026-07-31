@@ -14,6 +14,8 @@ from datetime import datetime
 from app.schemas.transaction import TransactionScoreRequest, TransactionScoreResponse
 from app.services.fraud_scorer import score_transaction
 
+from app.services.explainer import explain_transaction
+
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 
@@ -97,8 +99,8 @@ def transaction_stats(db: Session = Depends(get_db)):
 @router.post("/score", response_model=TransactionScoreResponse)
 def score_new_transaction(payload: TransactionScoreRequest, db: Session = Depends(get_db)):
     """
-    Score a new transaction for fraud risk in real time, and persist
-    it to the database with the model's prediction attached.
+    Score a new transaction for fraud risk in real time, explain the
+    prediction using SHAP, and persist it to the database.
     """
     txn_dict = {
         "amount": payload.amount,
@@ -107,7 +109,8 @@ def score_new_transaction(payload: TransactionScoreRequest, db: Session = Depend
         "timestamp": datetime.utcnow(),
     }
 
-    result = score_transaction(txn_dict)
+    result, X = score_transaction(txn_dict)
+    explanation = explain_transaction(X)
 
     new_txn = Transaction(
         card_id=payload.card_id,
@@ -116,7 +119,7 @@ def score_new_transaction(payload: TransactionScoreRequest, db: Session = Depend
         amount=payload.amount,
         currency=payload.currency,
         country=payload.country,
-        is_fraud=False,  # unknown ground truth for a brand-new live transaction
+        is_fraud=False,
         fraud_score=result["fraud_score"],
         predicted_fraud=result["predicted_fraud"],
         flagged=result["flagged"],
@@ -125,4 +128,4 @@ def score_new_transaction(payload: TransactionScoreRequest, db: Session = Depend
     db.commit()
     db.refresh(new_txn)
 
-    return TransactionScoreResponse(**result)
+    return TransactionScoreResponse(**result, explanation=explanation)
