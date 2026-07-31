@@ -9,7 +9,7 @@ from app.db.database import get_db
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionResponse, TransactionListResponse
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.schemas.transaction import TransactionScoreRequest, TransactionScoreResponse
 from app.services.fraud_scorer import score_transaction
@@ -106,7 +106,7 @@ def score_new_transaction(payload: TransactionScoreRequest, db: Session = Depend
         "amount": payload.amount,
         "country": payload.country,
         "merchant_category": payload.merchant_category,
-        "timestamp": datetime.utcnow(),
+        "timestamp": datetime.now(timezone.utc),
     }
 
     result, X = score_transaction(txn_dict)
