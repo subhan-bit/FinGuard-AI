@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FinGuard AI — Fraud Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #1a1d29;
+    --border: #2a2e3d;
+    --text: #e4e6eb;
+    --muted: #8b8fa3;
+    --accent: #4f7cff;
+    --danger: #ff5c72;
+    --success: #35d68e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  main { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .stat-card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card .value { font-size: 28px; font-weight: 600; margin-top: 6px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .panel h2 { margin: 0 0 16px; font-size: 15px; }
+
+  .score-form {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .score-form input, .score-form select {
+    background: #0f1117;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .score-form button {
+    grid-column: span 3;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .score-form button:hover { opacity: 0.9; }
+
+  .score-result {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 8px;
+    display: none;
+  }
+  .score-result.fraud { background: rgba(255, 92, 114, 0.1); border: 1px solid var(--danger); }
+  .score-result.legit { background: rgba(53, 214, 142, 0.1); border: 1px solid var(--success); }
+  .score-result .score-line { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+  .explanation-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; color: var(--muted); }
+  .explanation-row .impact-pos { color: var(--danger); }
+  .explanation-row .impact-neg { color: var(--success); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 10px; border-bottom: 1px solid var(--border); }
+  tr:hover { background: rgba(255,255,255,0.02); }
+
+  .badge { padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge.fraud { background: rgba(255, 92, 114, 0.15); color: var(--danger); }
+  .badge.legit { background: rgba(53, 214, 142, 0.15); color: var(--success); }
+
+  .filters { display: flex; gap: 10px; margin-bottom: 16px; }
+  .filters select {
+    background: #0f1117;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  .pagination { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
+  .pagination button {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pagination span { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FinGuard AI</h1>
+  <p>Real-Time Fraud Detection Dashboard</p>
+</header>
+
+<main>
+  <div class="stats" id="stats"></div>
+
+  <div class="panel">
+    <h2>Score a Transaction</h2>
+    <form class="score-form" id="scoreForm">
+      <input type="text" name="card_id" placeholder="Card ID (e.g. card_00042)" required>
+      <input type="text" name="merchant" placeholder="Merchant name" required>
+      <select name="merchant_category" required>
+        <option value="grocery">Grocery</option>
+        <option value="restaurant">Restaurant</option>
+        <option value="electronics">Electronics</option>
+        <option value="clothing">Clothing</option>
+        <option value="travel">Travel</option>
+        <option value="gas_station">Gas Station</option>
+        <option value="pharmacy">Pharmacy</option>
+        <option value="entertainment">Entertainment</option>
+        <option value="online_retail">Online Retail</option>
+        <option value="utilities">Utilities</option>
+        <option value="gambling">Gambling</option>
+        <option value="crypto_exchange">Crypto Exchange</option>
+        <option value="jewelry">Jewelry</option>
+        <option value="electronics_high_value">Electronics (High Value)</option>
+      </select>
+      <input type="number" step="0.01" name="amount" placeholder="Amount" required>
+      <select name="country" required>
+        <option value="US">United States</option>
+        <option value="GB">United Kingdom</option>
+        <option value="DE">Germany</option>
+        <option value="FR">France</option>
+        <option value="CA">Canada</option>
+        <option value="AU">Australia</option>
+        <option value="JP">Japan</option>
+        <option value="NG">Nigeria</option>
+        <option value="RU">Russia</option>
+        <option value="KP">North Korea</option>
+        <option value="IR">Iran</option>
+        <option value="PK">Pakistan</option>
+      </select>
+      <input type="text" name="currency" placeholder="Currency (e.g. USD)" value="USD" required>
+      <button type="submit">Score Transaction</button>
+    </form>
+    <div class="score-result" id="scoreResult"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Transactions</h2>
+    <div class="filters">
+      <select id="filterFraud">
+        <option value="">All transactions</option>
+        <option value="true">Fraud only</option>
+        <option value="false">Legit only</option>
+      </select>
+      <select id="filterFlagged">
+        <option value="">All flag states</option>
+        <option value="true">Flagged only</option>
+      </select>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Card</th>
+          <th>Merchant</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Country</th>
+          <th>Fraud Score</th>
+          <th>Label</th>
+        </tr>
+      </thead>
+      <tbody id="txnTableBody"></tbody>
+    </table>
+    <div class="pagination">
+      <button id="prevPage">← Prev</button>
+      <span id="pageInfo"></span>
+      <button id="nextPage">Next →</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const API = "";
+let currentPage = 1;
+const pageSize = 15;
+
+async function loadStats() {
+  const res = await fetch(`${API}/transactions/stats/summary`);
+  const data = await res.json();
+  const statsEl = document.getElementById("stats");
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="label">Total Transactions</div><div class="value">${data.total_transactions.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="label">Fraudulent</div><div class="value">${data.fraud_count.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="label">Fraud Rate</div><div class="value">${data.fraud_rate_percent}%</div></div>
+    <div class="stat-card"><div class="label">Flagged by Model</div><div class="value">${data.flagged_count.toLocaleString()}</div></div>
+  `;
+}
+
+async function loadTransactions() {
+  const isFraud = document.getElementById("filterFraud").value;
+  const flagged = document.getElementById("filterFlagged").value;
+
+  const params = new URLSearchParams({ page: currentPage, page_size: pageSize });
+  if (isFraud) params.append("is_fraud", isFraud);
+  if (flagged) params.append("flagged", flagged);
+
+  const res = await fetch(`${API}/transactions?${params}`);
+  const data = await res.json();
+
+  const tbody = document.getElementById("txnTableBody");
+  tbody.innerHTML = data.results.map(t => `
+    <tr>
+      <td>${new Date(t.timestamp).toLocaleString()}</td>
+      <td>${t.card_id}</td>
+      <td>${t.merchant}</td>
+      <td>${t.merchant_category ?? "-"}</td>
+      <td>${t.currency} ${t.amount.toFixed(2)}</td>
+      <td>${t.country ?? "-"}</td>
+      <td>${t.fraud_score !== null ? t.fraud_score.toFixed(3) : "-"}</td>
+      <td><span class="badge ${t.is_fraud ? "fraud" : "legit"}">${t.is_fraud ? "Fraud" : "Legit"}</span></td>
+    </tr>
+  `).join("");
+
+  const totalPages = Math.max(1, Math.ceil(data.total / pageSize));
+  document.getElementById("pageInfo").textContent = `Page ${currentPage} of ${totalPages}`;
+  document.getElementById("prevPage").disabled = currentPage <= 1;
+  document.getElementById("nextPage").disabled = currentPage >= totalPages;
+}
+
+document.getElementById("prevPage").addEventListener("click", () => {
+  if (currentPage > 1) { currentPage--; loadTransactions(); }
+});
+document.getElementById("nextPage").addEventListener("click", () => {
+  currentPage++; loadTransactions();
+});
+document.getElementById("filterFraud").addEventListener("change", () => { currentPage = 1; loadTransactions(); });
+document.getElementById("filterFlagged").addEventListener("change", () => { currentPage = 1; loadTransactions(); });
+
+document.getElementById("scoreForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const payload = {
+    card_id: form.card_id.value,
+    merchant: form.merchant.value,
+    merchant_category: form.merchant_category.value,
+    amount: parseFloat(form.amount.value),
+    currency: form.currency.value,
+    country: form.country.value,
+  };
+
+  const res = await fetch(`${API}/transactions/score`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+
+  const resultEl = document.getElementById("scoreResult");
+  resultEl.style.display = "block";
+  resultEl.className = `score-result ${data.predicted_fraud ? "fraud" : "legit"}`;
+  resultEl.innerHTML = `
+    <div class="score-line">
+      ${data.predicted_fraud ? "🚨 FLAGGED AS FRAUD" : "✅ Looks legitimate"}
+      — Score: ${(data.fraud_score * 100).toFixed(1)}%
+    </div>
+    ${data.explanation.map(f => `
+      <div class="explanation-row">
+        <span>${f.feature}</span>
+        <span class="${f.impact > 0 ? "impact-pos" : "impact-neg"}">${f.impact > 0 ? "+" : ""}${f.impact}</span>
+      </div>
+    `).join("")}
+  `;
+
+  loadStats();
+  loadTransactions();
+});
+
+loadStats();
+loadTransactions();
+</script>
+
+</body>
+</html>
