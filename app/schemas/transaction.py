@@ -36,3 +36,17 @@ class TransactionListResponse(BaseModel):
     page: int
     page_size: int
     results: list[TransactionResponse]
+
+class TransactionScoreRequest(BaseModel):
+    card_id: str
+    merchant: str
+    merchant_category: str
+    amount: float
+    currency: str = "USD"
+    country: str
+
+
+class TransactionScoreResponse(BaseModel):
+    fraud_score: float
+    predicted_fraud: bool
+    flagged: bool

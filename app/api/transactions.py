@@ -9,6 +9,11 @@ from app.db.database import get_db
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionResponse, TransactionListResponse
 
+from datetime import datetime
+
+from app.schemas.transaction import TransactionScoreRequest, TransactionScoreResponse
+from app.services.fraud_scorer import score_transaction
+
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 
@@ -88,3 +93,36 @@ def transaction_stats(db: Session = Depends(get_db)):
         "fraud_rate_percent": round((fraud_count / total * 100), 2) if total else 0,
         "flagged_count": flagged_count,
     }
+
+@router.post("/score", response_model=TransactionScoreResponse)
+def score_new_transaction(payload: TransactionScoreRequest, db: Session = Depends(get_db)):
+    """
+    Score a new transaction for fraud risk in real time, and persist
+    it to the database with the model's prediction attached.
+    """
+    txn_dict = {
+        "amount": payload.amount,
+        "country": payload.country,
+        "merchant_category": payload.merchant_category,
+        "timestamp": datetime.utcnow(),
+    }
+
+    result = score_transaction(txn_dict)
+
+    new_txn = Transaction(
+        card_id=payload.card_id,
+        merchant=payload.merchant,
+        merchant_category=payload.merchant_category,
+        amount=payload.amount,
+        currency=payload.currency,
+        country=payload.country,
+        is_fraud=False,  # unknown ground truth for a brand-new live transaction
+        fraud_score=result["fraud_score"],
+        predicted_fraud=result["predicted_fraud"],
+        flagged=result["flagged"],
+    )
+    db.add(new_txn)
+    db.commit()
+    db.refresh(new_txn)
+
+    return TransactionScoreResponse(**result)
